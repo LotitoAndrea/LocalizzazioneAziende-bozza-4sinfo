@@ -6,60 +6,8 @@
     <title>Trova Aziende - Prototipo</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <style>
-        /* Stile personalizzato per il layout */
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh; /* Altezza 100% dello schermo */
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Contenitore principale flessibile */
-        #app-container {
-            display: flex;
-            flex: 1;
-            height: 100%;
-            overflow: hidden; /* Niente scroll sulla pagina principale */
-        }
-
-        /* MENU LATERALE (Sidebar) */
-        #sidebar {
-            width: 350px;
-            background-color: #f8f9fa;
-            padding: 20px;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto; /* Scroll solo se la lista aziende è lunga */
-        }
-
-        /* MAPPA */
-        #map {
-            flex-grow: 1; /* Prende tutto lo spazio rimanente */
-            height: 100%;
-            z-index: 1;
-        }
-
-        /* Titolo nel menu */
-        .brand-title {
-            color: #2c3e50;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-
-        /* Stile della lista risultati (vuota per ora) */
-        #results-list {
-            margin-top: 20px;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -83,8 +31,8 @@
                 </select>
             </div>
 
-            <button class="btn btn-primary w-100 mb-2" onclick="cercaAziende()">Cerca Aziende</button>
-            <button class="btn btn-outline-secondary w-100" onclick="usaMiaPosizione()">Usa la mia posizione</button>
+            <button class="btn btn-primary w-100 mb-2" id="searchBtn">Cerca Aziende</button>
+            <button class="btn btn-outline-secondary w-100" id="myLocationBtn">Usa la mia posizione</button>
 
             <div id="results-list">
                 <p class="text-muted small">I risultati appariranno qui...</p>
@@ -95,68 +43,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <script>
-        // --- 1. INIZIALIZZAZIONE DELLA MAPPA ---
-        // Impostiamo una vista di default (es. Roma)
-        var map = L.map('map').setView([45.111, 7.662], 30);
-
-        // Aggiungiamo i "tiles" di OpenStreetMap (la grafica della mappa)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        // Variabili per gestire i marker e il cerchio
-        var currentMarker = null;
-        var searchCircle = null;
-
-        // --- 2. FUNZIONI (Placeholder per ora) ---
-
-        function cercaAziende() {
-            var indirizzo = document.getElementById('addressInput').value;
-            var raggio = document.getElementById('radiusInput').value;
-
-            if(indirizzo === "") {
-                alert("Inserisci un indirizzo per iniziare!");
-                return;
-            }
-
-            // SIMULAZIONE: Per ora facciamo solo un alert
-            alert("Hai cercato: " + indirizzo + " con raggio " + (raggio/1000) + "km.\n\nNel prossimo step collegheremo le API!");
-            
-            // Qui in futuro metteremo la chiamata all'API di Nominatim e Overpass
-        }
-
-        function usaMiaPosizione() {
-            if (!navigator.geolocation) {
-                alert("Il tuo browser non supporta la geolocalizzazione");
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    
-                    // Centra la mappa sulla posizione dell'utente
-                    map.setView([lat, lng], 14);
-
-                    // Rimuovi vecchi marker se ci sono
-                    if(currentMarker) map.removeLayer(currentMarker);
-
-                    // Aggiungi un marker
-                    currentMarker = L.marker([lat, lng]).addTo(map)
-                        .bindPopup("Sei qui!")
-                        .openPopup();
-
-                    document.getElementById('addressInput').value = "La mia posizione attuale";
-                }, 
-                () => {
-                    alert("Impossibile recuperare la tua posizione.");
-                }
-            );
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
