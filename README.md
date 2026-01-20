@@ -9,8 +9,10 @@ Un tool interattivo che permette di cercare aziende (uffici, industrie, artigian
 ## 🎯 Funzionalità Principali
 
 - **Ricerca per indirizzo**: Inserisci qualsiasi indirizzo e trova aziende nei dintorni
+- **Segna sulla Mappa** ✨: Clicca direttamente sulla mappa per posizionare il punto di ricerca
 - **Raggio personalizzabile**: Scegli tra 1, 5, 10 o 20 km di distanza
 - **Geolocalizzazione**: Usa la tua posizione corrente come punto di partenza
+- **Carica Aziende Associate**: Importa file Excel con le tue aziende partner
 - **Mappa interattiva**: Visualizza le aziende trovate su mappa con marker cliccabili
 - **Lista risultati**: Elenco dettagliato nella sidebar con nome e tipo di azienda
 - **Completamente gratuito**: Usa solo API open source (Nominatim e Overpass)
@@ -71,6 +73,63 @@ Poi apri `http://localhost:8000` nel browser
 - Autorizza il browser a usare la geolocalizzazione
 - La mappa si centrerà sulla tua posizione corrente
 - Potrai poi cercare aziende nei dintorni
+
+---
+
+### 4. **Segna sulla Mappa** ✨ (NUOVA FUNZIONALITÀ)
+
+Alternativa più intuitiva all'inserimento manuale dell'indirizzo:
+
+1. **Attiva la modalità selezione**
+   - Clicca sul pulsante **"📍 Segna sulla Mappa"**
+   - Il pulsante diventerà **"🎯 Modalità Selezione Attiva"** con effetto luminoso
+   - Il cursore sulla mappa diventerà un mirino
+   - Apparirà un messaggio guida sotto il pulsante
+
+2. **Posiziona il punto**
+   - Clicca in qualsiasi punto della mappa
+   - Verrà posizionato un marker viola nel punto selezionato
+   - Le coordinate verranno inserite automaticamente nel campo indirizzo
+   - La modalità selezione si disattiverà automaticamente
+
+3. **Cerca le aziende**
+   - Clicca su **"Cerca Aziende"**
+   - Il sistema cercherà aziende intorno al punto selezionato
+   - Non è necessaria la geocodifica (ricerca più veloce!)
+
+**Vantaggi:**
+- ✅ Più intuitivo e visuale
+- ✅ Preciso al metro
+- ✅ Non richiede conoscenza degli indirizzi
+- ✅ Perfetto per esplorare zone sconosciute
+
+---
+
+### 5. **Carica Aziende Associate** 🤝
+
+Importa un file Excel con le tue aziende partner o associate:
+
+1. **Prepara il file Excel**
+   - Deve contenere le colonne: `via`, `cap`, `città`, `provincia`
+   - Opzionale: colonna `nome` per il nome dell'azienda
+   - Clicca sull'icona ℹ️ per vedere un esempio del formato
+
+2. **Carica il file**
+   - Clicca su **"🤝 Carica Aziende Associate"**
+   - Seleziona il file Excel (.xlsx, .xls o .csv)
+   - Clicca su **"Elabora File"**
+
+3. **Visualizza le aziende associate**
+   - Le aziende verranno geocodificate automaticamente
+   - Appariranno sulla mappa con marker verdi
+   - Saranno elencate in una sezione separata nella sidebar
+   - Hanno priorità visiva rispetto alle altre aziende trovate
+
+**Caratteristiche:**
+- 🟢 Marker verdi distintivi
+- 🎨 Sfondo verde nella lista risultati
+- 🤝 Badge "Associata a ITIS Carlo Grassi" nei popup
+- 🗑️ Pulsante per rimuovere tutte le aziende associate
 
 ---
 
@@ -155,13 +214,18 @@ Questa query cerca:
 I dati ricevuti vengono processati e visualizzati:
 
 1. **Mappa**:
-   - Marker rosso per il punto di ricerca
+   - Marker rosso per il punto di ricerca (indirizzo)
+   - Marker verde per la posizione GPS dell'utente
+   - Marker viola per il punto selezionato sulla mappa 🆕
    - Cerchio blu per il raggio di ricerca
-   - Marker per ogni azienda trovata
+   - Marker standard per aziende trovate (Overpass)
+   - Marker verdi per aziende associate (Excel) 🆕
    - Popup con nome e tipo azienda
 
 2. **Sidebar**:
-   - Contatore risultati
+   - Sezione "Aziende Associate" (prioritaria, se presenti) 🆕
+   - Sezione "Altre Aziende Trovate" (da Overpass)
+   - Contatore risultati per ogni sezione
    - Lista cliccabile di tutte le aziende
    - Ogni elemento mostra nome e tipo
 
@@ -204,6 +268,13 @@ I dati ricevuti vengono processati e visualizzati:
 ```
 - Libreria JavaScript per mappe interattive
 
+### **SheetJS (xlsx)** 🆕
+```html
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+```
+- Libreria per leggere e processare file Excel (.xlsx, .xls, .csv)
+- Utilizzata per l'importazione delle aziende associate
+
 ---
 
 ## 🎨 Caratteristiche Design
@@ -211,13 +282,18 @@ I dati ricevuti vengono processati e visualizzati:
 - **Layout Responsive**: Si adatta a desktop, tablet e mobile
 - **Sidebar Scorrevole**: Lista risultati con scroll indipendente
 - **Animazioni Fluide**: Hover effects e transizioni smooth
+- **Animazione Pulsante Attivo** 🆕: Effetto "pulse-glow" per la modalità selezione
+- **Cursore Crosshair** 🆕: Feedback visivo durante la selezione sulla mappa
+- **Marker Colorati**: Diversi colori per diversi tipi di punti (rosso, verde, viola)
 - **Loading States**: Feedback visivo durante le ricerche
 - **Error Handling**: Messaggi chiari in caso di problemi
+- **Modal Informativo** 🆕: Guida per il formato del file Excel
 
 ---
 
-## 🔍 Esempi di Indirizzi da Testare (Torino)
+## 🔍 Esempi di Utilizzo
 
+### Ricerca Tradizionale (per indirizzo)
 - `Via Roma, Torino` - Centro città
 - `Corso Francia, Torino` - Zona commerciale
 - `Lingotto, Torino` - Ex area industriale
@@ -225,18 +301,31 @@ I dati ricevuti vengono processati e visualizzati:
 - `Piazza Castello, Torino` - Centro storico
 - `Via Buniva, Torino` - Zona ITIS Carlo Grassi
 
+### Nuova Modalità: Segna sulla Mappa 🆕
+1. Clicca su "📍 Segna sulla Mappa"
+2. Esplora la mappa e trova una zona di interesse
+3. Clicca sul punto desiderato (es: zona industriale, centro commerciale)
+4. Clicca su "Cerca Aziende"
+
+**Casi d'uso ideali:**
+- 🏭 Esplorare zone industriali visibili sulla mappa
+- 🏢 Cercare aziende vicino a un edificio specifico
+- 🛣️ Trovare aziende lungo una strada principale
+- 🗺️ Scoprire aree commerciali senza conoscere l'indirizzo
+
 ---
 
 ## 🛠️ Tecnologie Utilizzate
 
 - **HTML5** - Struttura semantica
-- **CSS3** - Styling moderno con Flexbox
+- **CSS3** - Styling moderno con Flexbox e Animazioni
 - **JavaScript ES6+** - Logica applicativa con async/await
-- **Bootstrap 5** - Framework CSS
-- **Leaflet.js** - Libreria mappe
+- **Bootstrap 5** - Framework CSS e componenti UI (Modal)
+- **Leaflet.js** - Libreria mappe interattive
+- **SheetJS (xlsx)** 🆕 - Parsing file Excel
 - **OpenStreetMap** - Dati geografici e tiles
-- **Nominatim API** - Geocoding
-- **Overpass API** - Query POI
+- **Nominatim API** - Geocoding (indirizzi e aziende Excel)
+- **Overpass API** - Query POI (aziende nel raggio)
 
 ---
 
@@ -299,6 +388,19 @@ Puoi modificare queste impostazioni in `script.js` nella funzione `initMap()`.
 - Controlla l'ortografia dell'indirizzo
 - Aggiungi più dettagli (città, provincia)
 - Prova con coordinate dirette (es: "45.1051, 7.6385")
+- **Alternativa**: Usa la funzione "Segna sulla Mappa" per evitare il geocoding 🆕
+
+### Problemi con il file Excel 🆕
+- Verifica che il file contenga le colonne obbligatorie: `via`, `città`
+- Controlla che le colonne siano scritte esattamente come richiesto (minuscolo)
+- Aggiungi `cap` e `provincia` per migliorare la precisione del geocoding
+- Alcuni indirizzi potrebbero non essere trovati (verranno segnalati nella console)
+
+### La modalità "Segna sulla Mappa" non funziona 🆕
+- Assicurati che il pulsante sia attivo (colore blu pieno, non contornato)
+- Verifica che il cursore sia un mirino quando passi sulla mappa
+- Prova a disattivare e riattivare la modalità
+- Controlla la console del browser per eventuali errori
 
 ---
 

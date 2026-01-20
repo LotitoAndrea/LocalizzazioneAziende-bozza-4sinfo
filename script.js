@@ -9,6 +9,7 @@ let companyMarkers = [];
 let partnerMarkers = [];
 let partnerCompanies = [];
 let uploadedFile = null;
+let clickOnMapMode = false; // Toggle for click-on-map mode
 
 // --- 1. MAP INITIALIZATION ---
 // Initialize map centered on ITIS Carlo Grassi, Turin
@@ -20,6 +21,13 @@ function initMap() {
         maxZoom: 19,
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
+
+    // Add click handler for placing points on map
+    map.on('click', function(e) {
+        if (clickOnMapMode) {
+            placePointOnMap(e.latlng.lat, e.latlng.lng);
+        }
+    });
 
     console.log('Map initialized at ITIS Carlo Grassi, Turin');  
 }
@@ -295,10 +303,18 @@ async function cercaAziende() {
     searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Ricerca in corso...';
 
     try {
-        // Step A: Geocode the address
-        console.log('Geocoding address:', address);
-        const coords = await geocodeAddress(address);
-        console.log('Coordinates found:', coords);
+        let coords;
+        
+        // Check if we have a marker placed on the map with stored coordinates
+        if (currentMarker && currentMarker.searchCoords) {
+            coords = currentMarker.searchCoords;
+            console.log('Using map-clicked coordinates:', coords);
+        } else {
+            // Step A: Geocode the address
+            console.log('Geocoding address:', address);
+            coords = await geocodeAddress(address);
+            console.log('Coordinates found:', coords);
+        }
 
         // Step B: Search for companies
         console.log('Searching companies within', radius, 'meters');
@@ -432,6 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Attach event listeners
     document.getElementById('searchBtn').addEventListener('click', cercaAziende);
     document.getElementById('myLocationBtn').addEventListener('click', usaMiaPosizione);
+    document.getElementById('clickOnMapBtn').addEventListener('click', toggleClickOnMapMode);
     
     // Excel upload event listeners
     document.getElementById('excelUpload').addEventListener('change', handleFileSelect);
@@ -773,4 +790,73 @@ function focusOnPartner(index) {
         map.setView(marker.getLatLng(), 17);
         marker.openPopup();
     }
+}
+
+// --- 14. CLICK ON MAP FUNCTIONALITY ---
+// Toggle click-on-map mode
+function toggleClickOnMapMode() {
+    const btn = document.getElementById('clickOnMapBtn');
+    const hint = document.getElementById('clickOnMapHint');
+    
+    clickOnMapMode = !clickOnMapMode;
+    
+    if (clickOnMapMode) {
+        btn.classList.remove('btn-outline-info');
+        btn.classList.add('btn-info');
+        btn.innerHTML = '🎯 Modalità Selezione Attiva';
+        hint.style.display = 'block';
+        hint.style.setProperty('display', 'block', 'important');
+        
+        // Change cursor on map
+        document.getElementById('map').style.cursor = 'crosshair';
+    } else {
+        btn.classList.remove('btn-info');
+        btn.classList.add('btn-outline-info');
+        btn.innerHTML = '📍 Segna sulla Mappa';
+        hint.style.display = 'none';
+        hint.style.setProperty('display', 'none', 'important');
+        
+        // Reset cursor
+        document.getElementById('map').style.cursor = '';
+    }
+}
+
+// Place a point on the map when clicked
+function placePointOnMap(lat, lng) {
+    // Clear previous marker
+    if (currentMarker) {
+        map.removeLayer(currentMarker);
+        currentMarker = null;
+    }
+    
+    // Clear previous search circle
+    if (searchCircle) {
+        map.removeLayer(searchCircle);
+        searchCircle = null;
+    }
+    
+    // Create purple marker for user-placed point
+    currentMarker = L.marker([lat, lng], {
+        icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        })
+    }).addTo(map);
+    
+    currentMarker.bindPopup('<strong>📍 Punto selezionato</strong><br><small>Clicca "Cerca Aziende" per trovare le aziende vicine</small>').openPopup();
+    
+    // Update address input with coordinates
+    document.getElementById('addressInput').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    
+    // Store coordinates for direct search (bypass geocoding)
+    currentMarker.searchCoords = { lat: lat, lng: lng };
+    
+    console.log('Point placed on map:', { lat, lng });
+    
+    // Disable click mode after placing (optional - can be toggled)
+    toggleClickOnMapMode();
 }
