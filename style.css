@@ -79,6 +79,20 @@ body {
     color: #6c757d;
 }
 
+/* Partner company result items (green theme) */
+.result-item.partner-company {
+    border-left: 3px solid #28a745;
+    background: linear-gradient(to right, #f0fdf4 0%, white 100%);
+}
+
+.result-item.partner-company:hover {
+    background: linear-gradient(to right, #dcfce7 0%, white 100%);
+}
+
+.result-item.partner-company::before {
+    content: '🤝 ';
+}
+
 /* Loading state for button */
 #searchBtn:disabled {
     opacity: 0.6;

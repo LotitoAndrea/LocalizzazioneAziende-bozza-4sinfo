@@ -6,6 +6,9 @@ let map;
 let currentMarker = null;
 let searchCircle = null;
 let companyMarkers = [];
+let partnerMarkers = [];
+let partnerCompanies = [];
+let uploadedFile = null;
 
 // --- 1. MAP INITIALIZATION ---
 // Initialize map centered on ITIS Carlo Grassi, Turin
@@ -219,22 +222,46 @@ function visualizeResults(companies, centerLat, centerLng, radiusMeters) {
 // --- 7. UPDATE RESULTS LIST IN SIDEBAR ---
 function updateResultsList(companies) {
     const resultsList = document.getElementById('results-list');
+    let html = '';
     
-    if (companies.length === 0) {
-        resultsList.innerHTML = '<p class="text-muted small">Nessuna azienda trovata nel raggio selezionato.</p>';
-        return;
+    // Show partner companies first
+    if (partnerCompanies.length > 0) {
+        html += `<h6 class="mt-3 mb-2" style="color: #28a745; font-weight: 600;">🤝 Aziende Associate (${partnerCompanies.length})</h6>`;
+        
+        partnerCompanies.forEach((company, index) => {
+            html += `
+                <div class="result-item partner-company" onclick="focusOnPartner(${index})">
+                    <strong>${company.nome}</strong>
+                    <small>${company.via}, ${company.citta}</small>
+                </div>
+            `;
+        });
     }
-
-    let html = `<div class="result-counter">${companies.length} aziende trovate</div>`;
     
-    companies.forEach((company, index) => {
-        html += `
-            <div class="result-item" onclick="focusOnCompany(${index})">
-                <strong>${company.name}</strong>
-                <small>${company.type}</small>
-            </div>
-        `;
-    });
+    // Show Overpass companies
+    if (companies.length > 0) {
+        if (partnerCompanies.length > 0) {
+            html += `<h6 class="mt-3 mb-2" style="color: #0d6efd; font-weight: 600;">🔍 Altre Aziende Trovate (${companies.length})</h6>`;
+        } else {
+            html += `<div class="result-counter">${companies.length} aziende trovate</div>`;
+        }
+        
+        companies.forEach((company, index) => {
+            html += `
+                <div class="result-item" onclick="focusOnCompany(${index})">
+                    <strong>${company.name}</strong>
+                    <small>${company.type}</small>
+                </div>
+            `;
+        });
+    }
+    
+    // Show empty state
+    if (companies.length === 0 && partnerCompanies.length === 0) {
+        html = '<p class="text-muted small">I risultati appariranno qui...</p>';
+    } else if (companies.length === 0 && partnerCompanies.length > 0) {
+        html += '<p class="text-muted small mt-3">Cerca aziende per visualizzare altri risultati.</p>';
+    }
     
     resultsList.innerHTML = html;
 }
@@ -358,6 +385,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Attach event listeners
     document.getElementById('searchBtn').addEventListener('click', cercaAziende);
     document.getElementById('myLocationBtn').addEventListener('click', usaMiaPosizione);
+    
+    // Excel upload event listeners
+    document.getElementById('excelUpload').addEventListener('change', handleFileSelect);
+    document.getElementById('processExcelBtn').addEventListener('click', processExcelFile);
+    document.getElementById('clearPartnersBtn').addEventListener('click', clearPartnerCompanies);
 
     // Allow Enter key to trigger search
     document.getElementById('addressInput').addEventListener('keypress', (e) => {
@@ -368,3 +400,330 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('B2B Lead Locator initialized successfully');
 });
+
+// --- 12. EXCEL UPLOAD FUNCTIONS ---
+
+// Handle file selection
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    uploadedFile = file;
+    
+    if (file) {
+        document.getElementById('processExcelBtn').disabled = false;
+        console.log('File selected:', file.name);
+    } else {
+        document.getElementById('processExcelBtn').disabled = true;
+    }
+}
+
+// Process Excel file
+async function processExcelFile() {
+    if (!uploadedFile) {
+        alert('Seleziona prima un file Excel!');
+        return;
+    }
+
+    const processBtn = document.getElementById('processExcelBtn');
+    const processText = document.getElementById('processExcelText');
+    const statusDiv = document.getElementById('excel-status');
+    
+    // Set loading state
+    processBtn.disabled = true;
+    processText.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Lettura file...';
+    statusDiv.style.display = 'block';
+    statusDiv.className = 'alert alert-info';
+    statusDiv.textContent = 'Lettura del file Excel in corso...';
+
+    try {
+        // Read file
+        const data = await readExcelFile(uploadedFile);
+        console.log('Excel data:', data);
+
+        // Validate data
+        if (data.length === 0) {
+            throw new Error('Il file Excel è vuoto o non contiene dati validi.');
+        }
+
+        // Check for required columns
+        const firstRow = data[0];
+        const hasVia = 'via' in firstRow || 'Via' in firstRow || 'indirizzo' in firstRow || 'Indirizzo' in firstRow;
+        const hasCitta = 'città' in firstRow || 'Città' in firstRow || 'citta' in firstRow || 'city' in firstRow || 'City' in firstRow;
+        const hasCap = 'cap' in firstRow || 'CAP' in firstRow || 'Cap' in firstRow || 'codice_postale' in firstRow;
+
+        if (!hasVia || !hasCitta) {
+            throw new Error('Il file Excel deve contenere le colonne "via" e "città" (o varianti simili).');
+        }
+        
+        // Warn if CAP is missing
+        if (!hasCap) {
+            console.warn('⚠️ Colonna CAP non trovata. La geocodifica potrebbe essere meno precisa.');
+        }
+
+        statusDiv.textContent = `File letto correttamente: ${data.length} aziende trovate. Inizio geocodifica...`;
+        processText.textContent = 'Geocodifica in corso...';
+
+        // Geocode companies
+        const geocodedCompanies = await geocodePartnerCompanies(data);
+        
+        // Store partner companies
+        partnerCompanies = geocodedCompanies.filter(c => !c.error);
+        
+        // Display on map
+        displayPartnerCompanies();
+        
+        // Update results list
+        updateResultsList([]);
+
+        // Show success
+        const successCount = partnerCompanies.length;
+        const failCount = geocodedCompanies.filter(c => c.error).length;
+        
+        statusDiv.className = 'alert alert-success';
+        statusDiv.textContent = `✓ ${successCount} aziende associate caricate con successo!${failCount > 0 ? ` (${failCount} indirizzi non geocodificati)` : ''}`;
+        
+        // Show clear button
+        document.getElementById('clearPartnersBtn').style.display = 'block';
+        
+        // Fit map to show all partner companies
+        if (partnerMarkers.length > 0) {
+            const group = L.featureGroup(partnerMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+
+    } catch (error) {
+        console.error('Excel processing error:', error);
+        statusDiv.className = 'alert alert-danger';
+        statusDiv.textContent = `Errore: ${error.message}`;
+    } finally {
+        processBtn.disabled = false;
+        processText.textContent = 'Elabora File';
+    }
+}
+
+// Read Excel file using SheetJS
+function readExcelFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = function(event) {
+            try {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Get first sheet
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                
+                resolve(jsonData);
+            } catch (error) {
+                reject(new Error('Errore nella lettura del file Excel: ' + error.message));
+            }
+        };
+        
+        reader.onerror = function() {
+            reject(new Error('Errore nella lettura del file.'));
+        };
+        
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// Geocode partner companies with rate limiting
+async function geocodePartnerCompanies(companies) {
+    const results = [];
+    const statusDiv = document.getElementById('excel-status');
+    let skippedCount = 0;
+    
+    for (let i = 0; i < companies.length; i++) {
+        const company = companies[i];
+        
+        // Normalize column names
+        const via = company.via || company.Via || company.indirizzo || company.Indirizzo || '';
+        const citta = company.città || company.Città || company.citta || company.city || company.City || '';
+        const cap = company.cap || company.CAP || company.Cap || company.codice_postale || '';
+        const provincia = company.provincia || company.Provincia || company.prov || company.Prov || company.PR || '';
+        const regione = company.regione || company.Regione || company.region || company.Region || '';
+        const nome = company.nome || company.Nome || company.ragione_sociale || company['Ragione Sociale'] || `Azienda ${i + 1}`;
+        
+        // Check if coordinates already exist
+        const existingLat = company.lat || company.Lat || company.LAT || company.latitudine || company.Latitudine || 
+                           company.latitude || company.Latitude || null;
+        const existingLng = company.lng || company.Lng || company.LNG || company.lon || company.Lon || company.LON ||
+                           company.longitudine || company.Longitudine || company.longitude || company.Longitude || null;
+        
+        // If valid coordinates exist, use them directly (skip geocoding)
+        if (existingLat && existingLng && !isNaN(existingLat) && !isNaN(existingLng)) {
+            const lat = parseFloat(existingLat);
+            const lng = parseFloat(existingLng);
+            
+            // Validate coordinates are reasonable (Italy is roughly 35-47 lat, 6-19 lng)
+            if (lat >= 35 && lat <= 47 && lng >= 6 && lng <= 19) {
+                results.push({
+                    nome: nome,
+                    via: via,
+                    citta: citta,
+                    cap: cap,
+                    provincia: provincia,
+                    lat: lat,
+                    lng: lng,
+                    address: `${via}, ${cap} ${citta}`,
+                    error: false,
+                    usedExistingCoords: true
+                });
+                
+                skippedCount++;
+                statusDiv.textContent = `Elaborazione in corso... (${i + 1}/${companies.length}) - ${nome} [coordinate esistenti]`;
+                console.log(`✓ Used existing coordinates: ${nome} at ${lat}, ${lng}`);
+                
+                // Small delay even when skipping geocoding
+                if (i < companies.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                continue;
+            }
+        }
+        
+        // Build address with all available information for better geocoding
+        // Priority: via, civico, CAP, città, provincia, regione, country
+        let addressParts = [];
+        
+        if (via) addressParts.push(via);
+        if (cap) addressParts.push(cap);
+        if (citta) addressParts.push(citta);
+        if (provincia) addressParts.push(`(${provincia.toUpperCase()})`);
+        if (regione && !provincia) addressParts.push(regione);
+        addressParts.push('Italy');
+        
+        const address = addressParts.join(', ');
+        
+        // Update progress
+        statusDiv.textContent = `Geocodifica in corso... (${i + 1}/${companies.length}) - ${nome}`;
+        
+        try {
+            const coords = await geocodeAddress(address);
+            results.push({
+                nome: nome,
+                via: via,
+                citta: citta,
+                cap: cap,
+                provincia: provincia,
+                lat: coords.lat,
+                lng: coords.lng,
+                address: address,
+                error: false,
+                usedExistingCoords: false
+            });
+            
+            console.log(`✓ Geocoded: ${nome} at ${address}`);
+            
+            // Delay to respect Nominatim rate limits (1 request per second)
+            if (i < companies.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1100));
+            }
+            
+        } catch (error) {
+            console.warn(`✗ Failed to geocode: ${address} - ${error.message}`);
+            results.push({
+                nome: nome,
+                via: via,
+                citta: citta,
+                cap: cap,
+                provincia: provincia,
+                address: address,
+                error: true,
+                errorMessage: error.message
+            });
+        }
+    }
+    
+    // Log summary
+    if (skippedCount > 0) {
+        console.log(`📊 Geocoding summary: ${skippedCount} companies used existing coordinates, ${companies.length - skippedCount} were geocoded.`);
+    }
+    
+    return results;
+}
+
+// Display partner companies on map
+function displayPartnerCompanies() {
+    // Clear existing partner markers
+    partnerMarkers.forEach(marker => map.removeLayer(marker));
+    partnerMarkers = [];
+    
+    // Create green icon for partner companies
+    const greenIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+    
+    // Add markers for each partner company
+    partnerCompanies.forEach((company, index) => {
+        const marker = L.marker([company.lat, company.lng], { icon: greenIcon }).addTo(map);
+        
+        // Create popup content with "Associated" badge
+        const popupContent = `
+            <div>
+                <div class="popup-company-name">${company.nome}</div>
+                <div class="popup-company-type">${company.via}, ${company.citta}</div>
+                <div style="margin-top: 8px; padding: 4px 8px; background-color: #28a745; color: white; border-radius: 4px; font-size: 0.85em; text-align: center;">
+                    🤝 Associata a ITIS Carlo Grassi
+                </div>
+            </div>
+        `;
+        
+        marker.bindPopup(popupContent);
+        partnerMarkers.push(marker);
+    });
+    
+    console.log(`Displayed ${partnerMarkers.length} partner company markers`);
+}
+
+// Clear partner companies
+function clearPartnerCompanies() {
+    if (!confirm('Vuoi rimuovere tutte le aziende associate dalla mappa?')) {
+        return;
+    }
+    
+    // Clear markers
+    partnerMarkers.forEach(marker => map.removeLayer(marker));
+    partnerMarkers = [];
+    partnerCompanies = [];
+    
+    // Clear file input
+    document.getElementById('excelUpload').value = '';
+    document.getElementById('processExcelBtn').disabled = true;
+    uploadedFile = null;
+    
+    // Hide status and clear button
+    document.getElementById('excel-status').style.display = 'none';
+    document.getElementById('clearPartnersBtn').style.display = 'none';
+    
+    // Update results list
+    updateResultsList([]);
+    
+    console.log('Partner companies cleared');
+}
+
+// --- 13. ENHANCED FOCUS ON COMPANY ---
+function focusOnCompany(index) {
+    if (index >= 0 && index < companyMarkers.length) {
+        const marker = companyMarkers[index];
+        map.setView(marker.getLatLng(), 17);
+        marker.openPopup();
+    }
+}
+
+function focusOnPartner(index) {
+    if (index >= 0 && index < partnerMarkers.length) {
+        const marker = partnerMarkers[index];
+        map.setView(marker.getLatLng(), 17);
+        marker.openPopup();
+    }
+}
