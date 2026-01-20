@@ -337,16 +337,41 @@ function usaMiaPosizione() {
     myLocationBtn.disabled = true;
     myLocationBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Rilevamento...';
 
+    // Request high-accuracy positioning with timeout
+    const options = {
+        enableHighAccuracy: true,  // Use GPS instead of IP-based location
+        timeout: 10000,            // Wait up to 10 seconds
+        maximumAge: 0              // Don't use cached position
+    };
+
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
             
-            // Center map on user location
-            map.setView([lat, lng], 14);
-
+            console.log('📍 Position detected:', {
+                lat: lat,
+                lng: lng,
+                accuracy: accuracy + ' meters',
+                timestamp: new Date(position.timestamp).toLocaleString()
+            });
+            
+            // Warn if accuracy is low (might be IP-based)
+            if (accuracy > 1000) {
+                console.warn('⚠️ Low accuracy detected (' + Math.round(accuracy) + 'm). This might be IP-based geolocation.');
+                if (!confirm(`Posizione rilevata con bassa precisione (±${Math.round(accuracy/1000)}km).\n\nPotrebbe essere basata sul tuo provider internet invece che GPS.\nVuoi comunque usarla?`)) {
+                    myLocationBtn.disabled = false;
+                    myLocationBtn.innerHTML = 'Usa la mia posizione';
+                    return;
+                }
+            }
+            
             // Clear previous markers
             clearPreviousResults();
+            
+            // Center map on user location
+            map.setView([lat, lng], 15);
 
             // Add marker at user location
             currentMarker = L.marker([lat, lng], {
@@ -359,21 +384,43 @@ function usaMiaPosizione() {
                     shadowSize: [41, 41]
                 })
             }).addTo(map);
-            currentMarker.bindPopup('Sei qui!').openPopup();
+            
+            const popupText = `<strong>Sei qui!</strong><br><small>Precisione: ±${Math.round(accuracy)}m</small>`;
+            currentMarker.bindPopup(popupText).openPopup();
+            
+            console.log('✓ User location marker created successfully');
 
             // Set input to indicate current location
-            document.getElementById('addressInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            document.getElementById('addressInput').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
             // Reset button
             myLocationBtn.disabled = false;
             myLocationBtn.innerHTML = 'Usa la mia posizione';
         }, 
         (error) => {
-            console.error('Geolocation error:', error);
-            alert('Impossibile recuperare la tua posizione. Verifica i permessi del browser.');
+            console.error('❌ Geolocation error:', error);
+            
+            let errorMessage = 'Impossibile recuperare la tua posizione.\n\n';
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage += 'Hai negato il permesso di geolocalizzazione.\n\nPer risolvere:\n- Clicca sull\'icona del lucchetto/informazioni nella barra degli indirizzi\n- Consenti l\'accesso alla posizione\n- Ricarica la pagina';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage += 'Posizione non disponibile. Verifica che il GPS sia attivo.';
+                    break;
+                case error.TIMEOUT:
+                    errorMessage += 'Timeout nel rilevamento della posizione. Riprova.';
+                    break;
+                default:
+                    errorMessage += 'Errore sconosciuto: ' + error.message;
+            }
+            
+            alert(errorMessage);
             myLocationBtn.disabled = false;
             myLocationBtn.innerHTML = 'Usa la mia posizione';
-        }
+        },
+        options  // Pass options for high accuracy
     );
 }
 
